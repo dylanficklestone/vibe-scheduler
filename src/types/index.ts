@@ -133,9 +133,18 @@ export interface ForumPost {
 export interface StoreProfile {
   id: string;
   name: string;
-  type: 'Coffee & Bakery' | 'Retail Boutique' | 'Bistro & Grill';
+  type: 'Coffee & Bakery' | 'Retail Boutique' | 'Bistro & Grill' | 'Quick Service F&B' | 'Specialty Retail';
+  storeCode?: string;
   location: string;
   operatingHours: string;
+  openingTime?: string;
+  closingTime?: string;
+  managerName?: string;
+  managerPhone?: string;
+  managerEmail?: string;
   dailyRevenueTarget: number;
   weeklyTargetBudget: number;
+  minStaffOnFloor?: number;
+  isFranchise?: boolean;
+  notes?: string;
 }

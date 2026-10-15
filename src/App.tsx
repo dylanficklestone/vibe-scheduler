@@ -9,6 +9,7 @@ import { AnalyticsInsights } from './components/AnalyticsInsights';
 import { CommunityForum } from './components/CommunityForum';
 import { BusinessModelCanvasModal } from './components/BusinessModelCanvasModal';
 import { ShiftModal } from './components/ShiftModal';
+import { StoreSettingsModal } from './components/StoreSettingsModal';
 import { getPublicHolidays } from './services/holidayService';
 import {
   INITIAL_STORES,
@@ -55,7 +56,33 @@ export default function App() {
   const [modalDefaultDay, setModalDefaultDay] = useState(0);
 
   const [isCanvasModalOpen, setIsCanvasModalOpen] = useState(false);
+  const [isStoreSettingsOpen, setIsStoreSettingsOpen] = useState(false);
   const [preSelectedShortageShift, setPreSelectedShortageShift] = useState<Shift | null>(null);
+
+  // Store Management Handlers
+  const handleAddStore = (newStore: StoreProfile) => {
+    setStores((prev) => [...prev, newStore]);
+    setActiveStore(newStore);
+  };
+
+  const handleUpdateStore = (updatedStore: StoreProfile) => {
+    setStores((prev) =>
+      prev.map((s) => (s.id === updatedStore.id ? updatedStore : s))
+    );
+    if (activeStore.id === updatedStore.id) {
+      setActiveStore(updatedStore);
+    }
+  };
+
+  const handleDeleteStore = (storeId: string) => {
+    setStores((prev) => {
+      const remaining = prev.filter((s) => s.id !== storeId);
+      if (activeStore.id === storeId && remaining.length > 0) {
+        setActiveStore(remaining[0]);
+      }
+      return remaining;
+    });
+  };
 
   // Fetch Public Holidays on mount from serverless connection /api/holiday
   useEffect(() => {
@@ -347,6 +374,7 @@ export default function App() {
         onSelectStore={setActiveStore}
         onOpenUrgentModal={() => handleOpenAdHocFromRoster()}
         onOpenCanvasModal={() => setIsCanvasModalOpen(true)}
+        onOpenStoreSettings={() => setIsStoreSettingsOpen(true)}
         urgentShiftsCount={urgentShifts.length}
       />
 
@@ -454,6 +482,18 @@ export default function App() {
         }}
       />
 
+      {/* Store Settings & Franchise Management Modal */}
+      <StoreSettingsModal
+        isOpen={isStoreSettingsOpen}
+        onClose={() => setIsStoreSettingsOpen(false)}
+        stores={stores}
+        activeStore={activeStore}
+        onSelectStore={(s) => setActiveStore(s)}
+        onAddStore={handleAddStore}
+        onUpdateStore={handleUpdateStore}
+        onDeleteStore={handleDeleteStore}
+      />
+
       {/* Quiet Footer */}
       <footer className="mt-auto border-t border-slate-200 bg-white py-4 text-xs text-slate-500">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 flex flex-col sm:flex-row items-center justify-between gap-2">
@@ -468,6 +508,14 @@ export default function App() {
           </div>
 
           <div className="flex items-center gap-3">
+            <button
+              onClick={() => setIsStoreSettingsOpen(true)}
+              className="text-slate-400 hover:text-slate-600 transition-colors cursor-pointer text-[11px]"
+              title="Manage Franchise Stores & Settings"
+            >
+              Store Settings
+            </button>
+            <span>·</span>
             <button
               onClick={() => setIsCanvasModalOpen(true)}
               className="text-slate-400 hover:text-slate-600 transition-colors cursor-pointer text-[11px]"
