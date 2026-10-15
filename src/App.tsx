@@ -9,6 +9,7 @@ import { AnalyticsInsights } from './components/AnalyticsInsights';
 import { CommunityForum } from './components/CommunityForum';
 import { BusinessModelCanvasModal } from './components/BusinessModelCanvasModal';
 import { ShiftModal } from './components/ShiftModal';
+import { HQReportsView } from './components/HQReportsView';
 import { getPublicHolidays } from './services/holidayService';
 import {
   INITIAL_STORES,
@@ -398,6 +399,7 @@ export default function App() {
             onApproveAll={handleApproveAllTimesheets}
             onAddTimesheet={handleAddTimesheet}
             onUpdateTimesheet={handleUpdateTimesheet}
+            onNavigateToHQReports={() => setCurrentTab('reports')}
           />
         )}
 
@@ -409,6 +411,18 @@ export default function App() {
             timesheets={timesheets}
             activeStore={activeStore}
             holidays={holidays}
+          />
+        )}
+
+        {currentTab === 'reports' && (
+          <HQReportsView
+            activeStore={activeStore}
+            inHouseStaff={inHouseStaff}
+            adHocWorkers={adHocWorkers}
+            shifts={shifts}
+            timesheets={timesheets}
+            holidays={holidays}
+            selectedWeekKey={selectedWeekKey}
           />
         )}
 

@@ -13,7 +13,7 @@ import {
 } from 'lucide-react';
 import { StoreProfile } from '../types';
 
-export type NavTab = 'roster' | 'adhoc' | 'staff' | 'timesheets' | 'salary' | 'analytics' | 'community';
+export type NavTab = 'roster' | 'adhoc' | 'staff' | 'timesheets' | 'salary' | 'reports' | 'analytics' | 'community';
 
 interface HeaderProps {
   currentTab: NavTab;
@@ -49,6 +49,7 @@ export const Header: React.FC<HeaderProps> = ({
     { key: 'staff', label: 'Staff' },
     { key: 'timesheets', label: 'Timesheets' },
     { key: 'salary', label: 'Salary' },
+    { key: 'reports', label: 'HQ Reports' },
     { key: 'analytics', label: 'Insights' },
     { key: 'community', label: 'Community' },
   ];

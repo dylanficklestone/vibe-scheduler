@@ -19,6 +19,7 @@ interface TimesheetManagerProps {
   onApproveAll: () => void;
   onAddTimesheet: (entry: TimesheetEntry) => void;
   onUpdateTimesheet: (entry: TimesheetEntry) => void;
+  onNavigateToHQReports?: () => void;
 }
 
 export const TimesheetManager: React.FC<TimesheetManagerProps> = ({
@@ -27,6 +28,7 @@ export const TimesheetManager: React.FC<TimesheetManagerProps> = ({
   onApproveAll,
   onAddTimesheet,
   onUpdateTimesheet,
+  onNavigateToHQReports,
 }) => {
   const [filter, setFilter] = useState<'all' | 'pending' | 'approved'>('all');
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -181,6 +183,39 @@ export const TimesheetManager: React.FC<TimesheetManagerProps> = ({
               {totalApprovedHours.toFixed(1)} hrs
             </span>
           </div>
+        </div>
+
+        {/* Weekly HQ Automated PDF Dispatch Info Callout */}
+        <div className="mt-4 pt-3.5 border-t border-slate-200 flex flex-col sm:flex-row sm:items-center justify-between gap-3 bg-slate-50 -mx-5 -mb-5 px-5 py-3.5 rounded-b-xl">
+          <div className="flex items-center gap-2.5">
+            <span className="p-1.5 rounded-md bg-slate-900 text-white shrink-0">
+              <FileText className="w-3.5 h-3.5" />
+            </span>
+            <div>
+              <div className="flex items-center gap-2">
+                <span className="text-xs font-bold text-slate-900">
+                  Weekly Staff Attendance & Hours PDF Report to HQ
+                </span>
+                <span className="inline-flex items-center gap-1 text-[10px] font-semibold text-emerald-700 bg-emerald-50 px-1.5 py-0.5 rounded border border-emerald-200">
+                  <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
+                  Auto-Dispatch: Mondays 08:00 AM
+                </span>
+              </div>
+              <p className="text-[11px] text-slate-500">
+                Weekly attendance, hours worked, and overtime audit logs are automatically formatted as a PDF and dispatched to HQ payroll.
+              </p>
+            </div>
+          </div>
+
+          {onNavigateToHQReports && (
+            <button
+              onClick={onNavigateToHQReports}
+              className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold text-slate-900 bg-white hover:bg-slate-100 border border-slate-300 rounded-lg shadow-xs transition-colors shrink-0 cursor-pointer"
+            >
+              <FileText className="w-3.5 h-3.5 text-slate-600" />
+              <span>HQ Report Control Center</span>
+            </button>
+          )}
         </div>
       </div>
 

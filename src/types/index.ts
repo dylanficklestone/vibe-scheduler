@@ -139,3 +139,65 @@ export interface StoreProfile {
   dailyRevenueTarget: number;
   weeklyTargetBudget: number;
 }
+
+export interface StaffAttendanceSummary {
+  staffId: string;
+  staffName: string;
+  role: ShiftRole;
+  employmentType: 'Full-Time' | 'Part-Time' | 'In-House Casual' | 'Ad-Hoc Casual';
+  isAdHoc: boolean;
+  shiftsScheduled: number;
+  shiftsAttended: number;
+  scheduledHours: number;
+  actualHours: number;
+  varianceHours: number;
+  overtimeHours: number;
+  punctualityRate: number; // percentage e.g. 100
+  attendanceStatus: 'Perfect' | 'On-Track' | 'Late Arrival' | 'Overtime Flag' | 'Under Hours';
+  discrepanciesCount: number;
+  hourlyRate: number;
+  estimatedGrossPay: number;
+}
+
+export interface HQReportSchedule {
+  id: string;
+  enabled: boolean;
+  frequency: 'weekly';
+  dayOfWeek: number; // 0=Sun, 1=Mon, ..., 6=Sat
+  deliveryTime: string; // e.g. "08:00"
+  timezone: string;
+  recipientEmail: string;
+  ccEmails: string[];
+  storeId: string;
+  storeName: string;
+  includeDetailedPunches: boolean;
+  includeWageEstimates: boolean;
+  includeDiscrepanciesOnly: boolean;
+  lastDispatchedAt?: string;
+  nextScheduledDispatch: string;
+}
+
+export interface HQReportHistoryItem {
+  id: string;
+  reportNumber: string;
+  weekLabel: string;
+  weekStartDate: string;
+  weekEndDate: string;
+  generatedAt: string;
+  dispatchedAt: string;
+  recipientEmail: string;
+  ccEmails: string[];
+  status: 'delivered' | 'pending' | 'failed';
+  trackingId: string;
+  totalStaff: number;
+  scheduledHours: number;
+  actualHours: number;
+  attendanceRate: number;
+  overtimeHours: number;
+  totalPayrollEstimate: number;
+  discrepanciesCount: number;
+  fileName: string;
+  fileSizeKb: number;
+  deliveryMethod: 'Automated Weekly Dispatch' | 'Manual Manager Send' | 'Test Run';
+}
+

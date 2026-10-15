@@ -3,6 +3,12 @@ import path from 'path';
 import { fileURLToPath } from 'url';
 import healthHandler from './api/health.ts';
 import holidayHandler from './api/holiday.ts';
+import {
+  getScheduleHandler,
+  updateScheduleHandler,
+  getHistoryHandler,
+  sendWeeklyReportHandler,
+} from './api/reports.ts';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -17,6 +23,12 @@ async function startServer() {
   app.get('/api/health', healthHandler);
   app.get('/api/holiday', holidayHandler);
   app.get('/api/holidays', holidayHandler);
+
+  // HQ Weekly Attendance & Hours Reporting API Endpoints
+  app.get('/api/reports/schedule', getScheduleHandler);
+  app.post('/api/reports/schedule', updateScheduleHandler);
+  app.get('/api/reports/history', getHistoryHandler);
+  app.post('/api/reports/send-weekly', sendWeeklyReportHandler);
 
   // In development, mount Vite's middleware
   if (process.env.NODE_ENV === 'production') {
