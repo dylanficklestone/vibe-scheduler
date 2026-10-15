@@ -61,7 +61,7 @@ export async function fetchNagerPublicHolidays(
       signal: controller.signal,
       headers: {
         Accept: 'application/json',
-        'User-Agent': 'ShiftPulse-Scheduler/1.0',
+        'User-Agent': 'Weekly-Roster-Shift-Operations/3.0',
       },
     });
     clearTimeout(timeoutId);

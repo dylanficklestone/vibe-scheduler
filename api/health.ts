@@ -14,7 +14,7 @@ export async function healthHandler(req?: Request | any, res?: Response | any) {
     timestamp: new Date().toISOString(),
     uptime: typeof process.uptime === 'function' ? process.uptime() : 0,
     environment: process.env.NODE_ENV || 'development',
-    service: 'ShiftPulse Serverless API',
+    service: 'Weekly Roster & Shift Operations API',
   };
 
   if (res && typeof res.status === 'function') {
