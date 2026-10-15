@@ -325,7 +325,7 @@ export const RosterScheduler: React.FC<RosterSchedulerProps> = ({
       </div>
 
       {/* 7-Day Roster Grid */}
-      <div className="grid grid-cols-1 md:grid-cols-7 gap-3">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-7 gap-2.5">
         {activeWeek.days.map((day) => {
           const dayShifts = filteredShifts
             .filter((s) => s.dayIndex === day.dayIndex)
