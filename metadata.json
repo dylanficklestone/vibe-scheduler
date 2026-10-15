@@ -1,0 +1,6 @@
+{
+  "name": "ShiftPulse | 1-Store Retail & F&B Manpower Scheduler",
+  "description": "Smart single-outlet roster scheduler with automated shifts, on-demand contract labour hire pool, timesheets, and salary calculation.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
