@@ -470,9 +470,10 @@ export default function App() {
           <div className="flex items-center gap-3">
             <button
               onClick={() => setIsCanvasModalOpen(true)}
-              className="text-slate-600 hover:text-slate-900 underline"
+              className="text-slate-400 hover:text-slate-600 transition-colors cursor-pointer text-[11px]"
+              title="View Strategyzer Canvas Mapping"
             >
-              Strategyzer Business Model Canvas Spec
+              Model Canvas
             </button>
             <span>·</span>
             <span>© 2026 ShiftPulse Operations</span>

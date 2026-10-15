@@ -7,9 +7,7 @@ import {
   DollarSign,
   BarChart2,
   MessageSquare,
-  Layers,
   Store,
-  ChevronDown,
   Menu,
   X,
 } from 'lucide-react';
@@ -24,7 +22,7 @@ interface HeaderProps {
   stores: StoreProfile[];
   onSelectStore: (store: StoreProfile) => void;
   onOpenUrgentModal: () => void;
-  onOpenCanvasModal: () => void;
+  onOpenCanvasModal?: () => void;
   urgentShiftsCount: number;
 }
 
@@ -41,7 +39,6 @@ export const Header: React.FC<HeaderProps> = ({
   stores,
   onSelectStore,
   onOpenUrgentModal,
-  onOpenCanvasModal,
   urgentShiftsCount,
 }) => {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
@@ -105,7 +102,7 @@ export const Header: React.FC<HeaderProps> = ({
             </div>
           </div>
 
-          {/* Zone 2: Navigation Links (Clean text tabs, no bulky pill slop) */}
+          {/* Zone 2: Navigation Links (Clean text tabs) */}
           <nav className="hidden lg:flex items-center gap-1 xl:gap-2">
             {navItems.map((item) => {
               const isActive = currentTab === item.key;
@@ -130,17 +127,8 @@ export const Header: React.FC<HeaderProps> = ({
             })}
           </nav>
 
-          {/* Zone 3: Actions (BMC Spec & Urgent Cover CTA) */}
+          {/* Zone 3: 1 Primary Action (Request Cover CTA) + mobile toggle */}
           <div className="flex items-center gap-2 shrink-0">
-            <button
-              onClick={onOpenCanvasModal}
-              title="View Strategyzer Business Model Canvas specification"
-              className="hidden sm:flex items-center gap-1 px-2.5 py-1.5 text-xs font-medium text-slate-600 hover:text-slate-900 bg-slate-100 hover:bg-slate-200 rounded-md transition-colors whitespace-nowrap"
-            >
-              <Layers className="w-3.5 h-3.5 text-slate-500" />
-              <span>BMC Spec</span>
-            </button>
-
             <button
               onClick={onOpenUrgentModal}
               className="flex items-center gap-1.5 px-3 py-1.5 sm:px-3.5 sm:py-2 text-xs font-semibold text-white bg-rose-600 hover:bg-rose-700 rounded-lg shadow-xs transition-colors whitespace-nowrap shrink-0 cursor-pointer"
@@ -161,7 +149,7 @@ export const Header: React.FC<HeaderProps> = ({
           </div>
         </div>
 
-        {/* Medium Screen & Mobile Horizontal Navigation Bar */}
+        {/* Medium Screen Horizontal Navigation Bar */}
         <div className="hidden md:flex lg:hidden items-center gap-1 py-1.5 border-t border-slate-100 overflow-x-auto scrollbar-none text-xs">
           {navItems.map((item) => {
             const isActive = currentTab === item.key;
@@ -178,12 +166,6 @@ export const Header: React.FC<HeaderProps> = ({
               </button>
             );
           })}
-          <button
-            onClick={onOpenCanvasModal}
-            className="px-2 py-1 text-xs text-slate-500 hover:text-slate-800 whitespace-nowrap"
-          >
-            BMC Spec
-          </button>
         </div>
 
         {/* Mobile Dropdown Menu when toggled */}
@@ -210,18 +192,6 @@ export const Header: React.FC<HeaderProps> = ({
                 </button>
               );
             })}
-            <div className="pt-2 border-t border-slate-100 flex items-center justify-between px-3">
-              <button
-                onClick={() => {
-                  onOpenCanvasModal();
-                  setMobileMenuOpen(false);
-                }}
-                className="text-xs font-medium text-slate-600 hover:text-slate-900 flex items-center gap-1"
-              >
-                <Layers className="w-3.5 h-3.5" />
-                <span>Strategyzer BMC Spec</span>
-              </button>
-            </div>
           </div>
         )}
       </div>
