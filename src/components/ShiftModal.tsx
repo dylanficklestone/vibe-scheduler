@@ -1,6 +1,28 @@
 import React, { useState, useEffect } from 'react';
-import { X, Trash2, Zap, Clock, UserCheck, DollarSign } from 'lucide-react';
-import { Shift, ShiftRole, InHouseStaff, AdHocWorker, ShiftTimeSlot, PublicHoliday } from '../types';
+import {
+  X,
+  Trash2,
+  Clock,
+  UserCheck,
+  DollarSign,
+  Users,
+  Repeat,
+  Bookmark,
+  Sparkles,
+  Coffee,
+  Check,
+  AlertTriangle,
+} from 'lucide-react';
+import {
+  Shift,
+  ShiftRole,
+  InHouseStaff,
+  AdHocWorker,
+  ShiftTimeSlot,
+  StoreProfile,
+  TaskTemplate,
+} from '../types';
+import { DEFAULT_TASK_TEMPLATES } from '../utils/storage';
 
 interface ShiftModalProps {
   isOpen: boolean;
@@ -9,11 +31,13 @@ interface ShiftModalProps {
   defaultDayIndex: number;
   inHouseStaff: InHouseStaff[];
   adHocWorkers: AdHocWorker[];
-  onSaveShift: (shift: Shift) => void;
+  activeStore: StoreProfile;
+  stores: StoreProfile[];
+  templates?: TaskTemplate[];
+  onSaveShift: (shift: Shift, isRecurring?: boolean, recurringType?: string) => void;
   onDeleteShift?: (shiftId: string) => void;
-  onOpenAdHocBooking?: (shift: Shift) => void;
-  holidays?: PublicHoliday[];
-  activeWeekDays?: { dayIndex: number; dateStr: string; name: string }[];
+  onSaveTemplate?: (template: TaskTemplate) => void;
+  activeWeekDays?: { dayIndex: number; dateStr: string; name: string; displayDate?: string }[];
 }
 
 const ROLES: ShiftRole[] = [
@@ -23,6 +47,8 @@ const ROLES: ShiftRole[] = [
   'Floor Lead',
   'Retail Associate',
   'Inventory / Stock',
+  'Dishwasher / Cleaner',
+  'Supervisor',
 ];
 
 const TIME_SLOT_PRESETS: { label: ShiftTimeSlot; start: string; end: string; hours: number }[] = [
@@ -41,183 +67,322 @@ export const ShiftModal: React.FC<ShiftModalProps> = ({
   defaultDayIndex,
   inHouseStaff,
   adHocWorkers,
+  activeStore,
+  stores,
+  templates = DEFAULT_TASK_TEMPLATES,
   onSaveShift,
   onDeleteShift,
-  onOpenAdHocBooking,
-  holidays = [],
+  onSaveTemplate,
   activeWeekDays = [],
 }) => {
-  const [dayIndex, setDayIndex] = useState(defaultDayIndex);
+  // Form fields
+  const [storeId, setStoreId] = useState(activeStore.id);
+  const [taskName, setTaskName] = useState('');
+  const [taskDescription, setTaskDescription] = useState('');
   const [role, setRole] = useState<ShiftRole>('Barista');
-  const [slotType, setSlotType] = useState<ShiftTimeSlot>('Morning');
+  const [dayIndex, setDayIndex] = useState(defaultDayIndex);
   const [startTime, setStartTime] = useState('07:30');
   const [endTime, setEndTime] = useState('15:30');
-  const [hours, setHours] = useState(8);
-  const [assignmentType, setAssignmentType] = useState<'in_house' | 'adhoc' | 'unassigned' | 'urgent'>('in_house');
-  const [selectedStaffId, setSelectedStaffId] = useState<string>('');
-  const [selectedAdHocId, setSelectedAdHocId] = useState<string>('');
+  const [slotType, setSlotType] = useState<ShiftTimeSlot>('Morning');
+  const [requiredHeadcount, setRequiredHeadcount] = useState<number>(1);
   const [hourlyRate, setHourlyRate] = useState<number>(18);
+  const [requiredSkills, setRequiredSkills] = useState<ShiftRole[]>(['Barista']);
+  const [unpaidBreakMinutes, setUnpaidBreakMinutes] = useState<number>(30);
+  const [recurringSchedule, setRecurringSchedule] = useState<'none' | 'daily' | 'weekdays' | 'weekends' | 'weekly'>('none');
   const [notes, setNotes] = useState('');
+  const [saveAsTemplate, setSaveAsTemplate] = useState(false);
 
+  // Worker assignment (supports multi-worker assignment)
+  const [assignedWorkerIds, setAssignedWorkerIds] = useState<string[]>([]);
+
+  // Calculation of hours
+  const calculateHours = (start: string, end: string, breakMins: number = 0) => {
+    const [startH, startM] = start.split(':').map(Number);
+    const [endH, endM] = end.split(':').map(Number);
+    let diff = endH * 60 + endM - (startH * 60 + startM);
+    if (diff < 0) diff += 24 * 60; // overnight
+    const netMins = Math.max(diff - breakMins, 30);
+    return Math.round((netMins / 60) * 10) / 10;
+  };
+
+  const hours = calculateHours(startTime, endTime, unpaidBreakMinutes);
+  const shortage = Math.max(requiredHeadcount - assignedWorkerIds.length, 0);
+
+  // Populate on open or edit
   useEffect(() => {
     if (shiftToEdit) {
-      setDayIndex(shiftToEdit.dayIndex);
+      setStoreId(shiftToEdit.storeId || activeStore.id);
+      setTaskName(shiftToEdit.taskName || `${shiftToEdit.role} Shift`);
+      setTaskDescription(shiftToEdit.taskDescription || '');
       setRole(shiftToEdit.role);
-      setSlotType(shiftToEdit.slotType);
+      setDayIndex(shiftToEdit.dayIndex);
       setStartTime(shiftToEdit.startTime);
       setEndTime(shiftToEdit.endTime);
-      setHours(shiftToEdit.hours);
+      setSlotType(shiftToEdit.slotType);
+      setRequiredHeadcount(shiftToEdit.requiredHeadcount || 1);
       setHourlyRate(shiftToEdit.hourlyRate);
+      setRequiredSkills(shiftToEdit.requiredSkills || [shiftToEdit.role]);
+      setUnpaidBreakMinutes(shiftToEdit.unpaidBreakMinutes ?? 30);
+      setRecurringSchedule(shiftToEdit.recurringSchedule || 'none');
       setNotes(shiftToEdit.notes || '');
 
-      if (shiftToEdit.status === 'urgent_needed') {
-        setAssignmentType('urgent');
-      } else if (shiftToEdit.isAdHoc && shiftToEdit.assignedAdHocId) {
-        setAssignmentType('adhoc');
-        setSelectedAdHocId(shiftToEdit.assignedAdHocId);
-      } else if (shiftToEdit.assignedStaffId) {
-        setAssignmentType('in_house');
-        setSelectedStaffId(shiftToEdit.assignedStaffId);
-      } else {
-        setAssignmentType('unassigned');
-      }
+      const currentAssigned = shiftToEdit.assignedWorkerIds?.length
+        ? [...shiftToEdit.assignedWorkerIds]
+        : shiftToEdit.assignedStaffId
+        ? [shiftToEdit.assignedStaffId]
+        : shiftToEdit.assignedAdHocId
+        ? [shiftToEdit.assignedAdHocId]
+        : [];
+      setAssignedWorkerIds(currentAssigned);
     } else {
-      setDayIndex(defaultDayIndex);
+      setStoreId(activeStore.id);
+      setTaskName('Morning Barista Opening');
+      setTaskDescription('Espresso machine dial-in, opening register, pastry display setup.');
       setRole('Barista');
-      setSlotType('Morning');
+      setDayIndex(defaultDayIndex);
       setStartTime('07:30');
       setEndTime('15:30');
-      setHours(8);
+      setSlotType('Morning');
+      setRequiredHeadcount(1);
       setHourlyRate(18);
+      setRequiredSkills(['Barista']);
+      setUnpaidBreakMinutes(30);
+      setRecurringSchedule('none');
       setNotes('');
-      setAssignmentType('in_house');
-      // pre-select first staff that has matching skill and available on this day
+      setSaveAsTemplate(false);
+
+      // Pre-select first eligible candidate if available
       const candidate = inHouseStaff.find(
         (s) => s.skills.includes('Barista') && s.availableDays.includes(defaultDayIndex)
-      ) || inHouseStaff[0];
-      if (candidate) {
-        setSelectedStaffId(candidate.id);
-        setHourlyRate(candidate.hourlyRate);
-      }
+      );
+      setAssignedWorkerIds(candidate ? [candidate.id] : []);
     }
-  }, [shiftToEdit, defaultDayIndex, inHouseStaff]);
+  }, [shiftToEdit, defaultDayIndex, activeStore, inHouseStaff, isOpen]);
 
   if (!isOpen) return null;
 
-  const handleSlotPresetChange = (preset: typeof TIME_SLOT_PRESETS[0]) => {
+  // Apply a template
+  const handleApplyTemplate = (tmplId: string) => {
+    const tmpl = templates.find((t) => t.id === tmplId);
+    if (!tmpl) return;
+    setTaskName(tmpl.taskName);
+    setTaskDescription(tmpl.taskDescription);
+    setRole(tmpl.role);
+    setStartTime(tmpl.startTime);
+    setEndTime(tmpl.endTime);
+    setSlotType(tmpl.slotType);
+    setRequiredHeadcount(tmpl.requiredHeadcount);
+    setHourlyRate(tmpl.hourlyRate);
+    setRequiredSkills(tmpl.requiredSkills);
+    setUnpaidBreakMinutes(tmpl.unpaidBreakMinutes);
+  };
+
+  const toggleWorkerAssignment = (workerId: string) => {
+    setAssignedWorkerIds((prev) => {
+      if (prev.includes(workerId)) {
+        return prev.filter((id) => id !== workerId);
+      }
+      return [...prev, workerId];
+    });
+  };
+
+  const toggleSkill = (skill: ShiftRole) => {
+    setRequiredSkills((prev) =>
+      prev.includes(skill) ? prev.filter((s) => s !== skill) : [...prev, skill]
+    );
+  };
+
+  const handlePresetSlot = (preset: (typeof TIME_SLOT_PRESETS)[0]) => {
     setSlotType(preset.label);
     setStartTime(preset.start);
     setEndTime(preset.end);
-    setHours(preset.hours);
-  };
-
-  const handleStaffChange = (staffId: string) => {
-    setSelectedStaffId(staffId);
-    const staff = inHouseStaff.find((s) => s.id === staffId);
-    if (staff) {
-      setHourlyRate(staff.hourlyRate);
-    }
-  };
-
-  const handleAdHocChange = (adhocId: string) => {
-    setSelectedAdHocId(adhocId);
-    const worker = adHocWorkers.find((w) => w.id === adhocId);
-    if (worker) {
-      setHourlyRate(worker.hourlyRate);
-    }
   };
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
 
-    const updatedShift: Shift = {
-      id: shiftToEdit ? shiftToEdit.id : `shift_${Date.now()}`,
+    const dateStr =
+      activeWeekDays[dayIndex]?.dateStr ||
+      shiftToEdit?.dateStr ||
+      `2026-10-${19 + dayIndex}`;
+
+    const isAdHoc = assignedWorkerIds.some((id) => id.startsWith('adhoc_'));
+    const staffId = assignedWorkerIds.find((id) => id.startsWith('staff_'));
+    const adHocId = assignedWorkerIds.find((id) => id.startsWith('adhoc_'));
+
+    // Status derivation
+    let status: any = 'unfilled';
+    if (isAdHoc) {
+      status = 'filled';
+    } else if (assignedWorkerIds.length >= requiredHeadcount) {
+      status = 'fully_staffed';
+    } else if (assignedWorkerIds.length > 0) {
+      status = 'partially_staffed';
+    } else {
+      status = 'urgent_needed';
+    }
+
+    const savedShift: Shift = {
+      id: shiftToEdit ? shiftToEdit.id : `shift_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`,
+      storeId,
+      companyName: stores.find((s) => s.id === storeId)?.name || activeStore.name,
+      taskName: taskName.trim() || `${role} Shift`,
+      taskDescription: taskDescription.trim(),
       dayIndex,
-      dateStr: shiftToEdit ? shiftToEdit.dateStr : `2026-10-${19 + dayIndex}`,
+      dateStr,
       startTime,
       endTime,
-      hours: Number(hours),
+      hours,
       role,
       slotType,
-      isAdHoc: assignmentType === 'adhoc',
-      status: assignmentType === 'urgent' ? 'urgent_needed' : (assignmentType === 'unassigned' ? 'unassigned' : 'filled'),
-      hourlyRate: Number(hourlyRate),
-      notes: notes.trim() || undefined,
-      assignedStaffId: assignmentType === 'in_house' ? selectedStaffId : undefined,
-      assignedAdHocId: assignmentType === 'adhoc' ? selectedAdHocId : undefined,
+      requiredHeadcount: Number(requiredHeadcount) || 1,
+      assignedWorkerIds,
+      assignedStaffId: staffId,
+      assignedAdHocId: adHocId,
+      isAdHoc,
+      status,
+      notes: notes.trim(),
+      hourlyRate: Number(hourlyRate) || 18,
+      requiredSkills,
+      unpaidBreakMinutes,
+      recurringSchedule,
     };
 
-    onSaveShift(updatedShift);
+    // If manager ticked "Save as reusable template"
+    if (saveAsTemplate && onSaveTemplate) {
+      onSaveTemplate({
+        id: `tmpl_${Date.now()}`,
+        taskName: savedShift.taskName || `${role} Shift`,
+        taskDescription: savedShift.taskDescription || '',
+        role: savedShift.role,
+        startTime: savedShift.startTime,
+        endTime: savedShift.endTime,
+        hours: savedShift.hours,
+        requiredHeadcount: Number(savedShift.requiredHeadcount) || 1,
+        hourlyRate: savedShift.hourlyRate,
+        requiredSkills: savedShift.requiredSkills || [savedShift.role],
+        slotType: savedShift.slotType,
+        unpaidBreakMinutes: savedShift.unpaidBreakMinutes || 30,
+      });
+    }
+
+    onSaveShift(savedShift, recurringSchedule !== 'none', recurringSchedule);
     onClose();
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/40 backdrop-blur-xs">
-      <div className="bg-white rounded-xl shadow-xl border border-slate-200 w-full max-w-lg overflow-hidden animate-in fade-in zoom-in-95 duration-150">
+    <div className="fixed inset-0 z-50 overflow-y-auto bg-slate-900/50 backdrop-blur-xs flex items-center justify-center p-3 sm:p-4">
+      <div className="relative bg-white dark:bg-slate-900 rounded-2xl max-w-2xl w-full border border-slate-200 dark:border-slate-800 shadow-2xl overflow-hidden animate-in fade-in zoom-in-95 duration-150">
         {/* Header */}
-        <div className="flex items-center justify-between px-6 py-4 border-b border-slate-100">
+        <div className="px-6 py-4 border-b border-slate-200 dark:border-slate-800 flex items-center justify-between">
           <div>
-            <h3 className="text-base font-semibold text-slate-900">
-              {shiftToEdit ? 'Edit Shift Details' : 'Schedule New Shift'}
-            </h3>
-            <p className="text-xs text-slate-500">
-              {DAYS[dayIndex]} · 1-Store Manpower Operation
+            <h2 className="text-lg font-bold text-slate-900 dark:text-white">
+              {shiftToEdit ? 'Edit Operational Shift' : 'Create Task & Shift Schedule'}
+            </h2>
+            <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
+              Specify required headcount, schedule, role requirements, and worker assignments.
             </p>
           </div>
           <button
             onClick={onClose}
-            className="text-slate-400 hover:text-slate-600 p-1 rounded-md transition-colors"
+            className="p-1.5 rounded-lg text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors"
           >
             <X className="w-5 h-5" />
           </button>
         </div>
 
-        <form onSubmit={handleSubmit} className="p-6 space-y-4 max-h-[80vh] overflow-y-auto">
-          {(() => {
-            const activeDateStr = shiftToEdit?.dateStr || activeWeekDays.find((d) => d.dayIndex === dayIndex)?.dateStr;
-            const matchedHoliday = holidays.find((h) => h.date === activeDateStr);
-            if (!matchedHoliday) return null;
-            return (
-              <div className="p-2.5 bg-amber-50 border border-amber-300 rounded-lg text-xs text-amber-900 flex items-center gap-2">
-                <span className="font-bold">★ Gazetted Public Holiday ({matchedHoliday.name}):</span>
-                <span className="text-[11px]">2.0× double pay or premium rates apply for this shift.</span>
-              </div>
-            );
-          })()}
-
-          {/* Day of Week */}
-          <div>
-            <label className="block text-xs font-semibold text-slate-700 mb-1.5">
-              Day of Week
-            </label>
-            <div className="grid grid-cols-7 gap-1">
-              {DAYS.map((day, idx) => (
-                <button
-                  type="button"
-                  key={day}
-                  onClick={() => setDayIndex(idx)}
-                  className={`py-1.5 text-xs font-medium rounded text-center transition-colors ${
-                    dayIndex === idx
-                      ? 'bg-slate-900 text-white'
-                      : 'bg-slate-50 text-slate-600 hover:bg-slate-100'
-                  }`}
-                >
-                  {day.slice(0, 3)}
-                </button>
+        {/* Template Quick Loader */}
+        {!shiftToEdit && templates.length > 0 && (
+          <div className="px-6 py-2.5 bg-slate-50 dark:bg-slate-850 border-b border-slate-200 dark:border-slate-800 flex items-center justify-between gap-3 text-xs">
+            <span className="font-semibold text-slate-600 dark:text-slate-300 flex items-center gap-1.5">
+              <Bookmark className="w-3.5 h-3.5 text-indigo-500" /> Apply Saved Template:
+            </span>
+            <select
+              onChange={(e) => handleApplyTemplate(e.target.value)}
+              defaultValue=""
+              className="text-xs bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg px-2.5 py-1 text-slate-700 dark:text-slate-200 focus:outline-none focus:ring-2 focus:ring-indigo-500 cursor-pointer"
+            >
+              <option value="" disabled>
+                Select template...
+              </option>
+              {templates.map((t) => (
+                <option key={t.id} value={t.id}>
+                  {t.taskName} ({t.role} · {t.hours}h)
+                </option>
               ))}
+            </select>
+          </div>
+        )}
+
+        {/* Form Body */}
+        <form onSubmit={handleSubmit} className="p-6 space-y-5 max-h-[75vh] overflow-y-auto">
+          {/* Row 1: Outlet / Stall & Day */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <div>
+              <label className="block text-xs font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400 mb-1.5">
+                Stall / Outlet *
+              </label>
+              <select
+                value={storeId}
+                onChange={(e) => setStoreId(e.target.value)}
+                className="w-full text-xs font-semibold bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl p-2.5 text-slate-800 dark:text-slate-200 focus:ring-2 focus:ring-indigo-500"
+              >
+                {stores.map((s) => (
+                  <option key={s.id} value={s.id}>
+                    {s.name} ({s.type})
+                  </option>
+                ))}
+              </select>
+            </div>
+
+            <div>
+              <label className="block text-xs font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400 mb-1.5">
+                Day of Week *
+              </label>
+              <select
+                value={dayIndex}
+                onChange={(e) => setDayIndex(Number(e.target.value))}
+                className="w-full text-xs font-semibold bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl p-2.5 text-slate-800 dark:text-slate-200 focus:ring-2 focus:ring-indigo-500"
+              >
+                {DAYS.map((dayName, idx) => (
+                  <option key={dayName} value={idx}>
+                    {dayName} {activeWeekDays[idx]?.displayDate ? `(${activeWeekDays[idx]?.displayDate})` : ''}
+                  </option>
+                ))}
+              </select>
             </div>
           </div>
 
-          {/* Role & Time Preset */}
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+          {/* Row 2: Task Name & Job Role */}
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+            <div className="sm:col-span-2">
+              <label className="block text-xs font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400 mb-1.5">
+                Task / Shift Name *
+              </label>
+              <input
+                type="text"
+                required
+                value={taskName}
+                onChange={(e) => setTaskName(e.target.value)}
+                placeholder="e.g. Morning Barista & Register Opening"
+                className="w-full text-xs bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl p-2.5 text-slate-800 dark:text-slate-200 focus:ring-2 focus:ring-indigo-500"
+              />
+            </div>
+
             <div>
-              <label className="block text-xs font-semibold text-slate-700 mb-1">
-                Required Role
+              <label className="block text-xs font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400 mb-1.5">
+                Primary Job Role *
               </label>
               <select
                 value={role}
-                onChange={(e) => setRole(e.target.value as ShiftRole)}
-                className="w-full text-xs font-medium bg-slate-50 border border-slate-200 rounded-lg px-3 py-2 text-slate-900 focus:outline-none focus:ring-1 focus:ring-slate-500"
+                onChange={(e) => {
+                  const newRole = e.target.value as ShiftRole;
+                  setRole(newRole);
+                  if (!requiredSkills.includes(newRole)) {
+                    setRequiredSkills([newRole]);
+                  }
+                }}
+                className="w-full text-xs font-semibold bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl p-2.5 text-slate-800 dark:text-slate-200 focus:ring-2 focus:ring-indigo-500"
               >
                 {ROLES.map((r) => (
                   <option key={r} value={r}>
@@ -226,276 +391,309 @@ export const ShiftModal: React.FC<ShiftModalProps> = ({
                 ))}
               </select>
             </div>
-
-            <div>
-              <label className="block text-xs font-semibold text-slate-700 mb-1">
-                Time Slot Preset
-              </label>
-              <div className="grid grid-cols-3 gap-1">
-                {TIME_SLOT_PRESETS.slice(0, 3).map((preset) => (
-                  <button
-                    type="button"
-                    key={preset.label}
-                    onClick={() => handleSlotPresetChange(preset)}
-                    className={`py-1.5 text-[11px] font-medium rounded transition-colors ${
-                      slotType === preset.label
-                        ? 'bg-slate-800 text-white'
-                        : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
-                    }`}
-                  >
-                    {preset.label}
-                  </button>
-                ))}
-              </div>
-            </div>
           </div>
 
-          {/* Times & Hours */}
-          <div className="grid grid-cols-3 gap-3 bg-slate-50 p-3 rounded-lg border border-slate-200">
-            <div>
-              <label className="block text-[11px] text-slate-500 mb-1">Start Time</label>
-              <input
-                type="time"
-                value={startTime}
-                onChange={(e) => setStartTime(e.target.value)}
-                className="w-full text-xs font-mono font-medium bg-white border border-slate-200 rounded px-2 py-1 text-slate-900"
-              />
-            </div>
-            <div>
-              <label className="block text-[11px] text-slate-500 mb-1">End Time</label>
-              <input
-                type="time"
-                value={endTime}
-                onChange={(e) => setEndTime(e.target.value)}
-                className="w-full text-xs font-mono font-medium bg-white border border-slate-200 rounded px-2 py-1 text-slate-900"
-              />
-            </div>
-            <div>
-              <label className="block text-[11px] text-slate-500 mb-1">Shift Hours</label>
-              <input
-                type="number"
-                step="0.5"
-                min="1"
-                max="16"
-                value={hours}
-                onChange={(e) => setHours(parseFloat(e.target.value) || 0)}
-                className="w-full text-xs font-mono font-medium bg-white border border-slate-200 rounded px-2 py-1 text-slate-900"
-              />
-            </div>
-          </div>
-
-          {/* Manpower Assignment Type (Key BMC feature: In-house vs Ad-hoc ready pool) */}
+          {/* Task Description */}
           <div>
-            <label className="block text-xs font-semibold text-slate-700 mb-1.5">
-              Manpower Fulfillment
+            <label className="block text-xs font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400 mb-1.5">
+              Task Description & Operating Procedures
             </label>
-            <div className="grid grid-cols-2 sm:grid-cols-4 gap-1.5">
-              <button
-                type="button"
-                onClick={() => setAssignmentType('in_house')}
-                className={`py-1.5 px-2 text-xs font-medium rounded-md text-center transition-colors ${
-                  assignmentType === 'in_house'
-                    ? 'bg-slate-900 text-white'
-                    : 'bg-slate-100 text-slate-700 hover:bg-slate-200'
-                }`}
-              >
-                In-House Staff
-              </button>
-              <button
-                type="button"
-                onClick={() => setAssignmentType('adhoc')}
-                className={`py-1.5 px-2 text-xs font-medium rounded-md text-center transition-colors flex items-center justify-center gap-1 ${
-                  assignmentType === 'adhoc'
-                    ? 'bg-amber-600 text-white'
-                    : 'bg-amber-50 text-amber-800 hover:bg-amber-100'
-                }`}
-              >
-                <Zap className="w-3 h-3" />
-                <span>Ad-Hoc Pool</span>
-              </button>
-              <button
-                type="button"
-                onClick={() => setAssignmentType('urgent')}
-                className={`py-1.5 px-2 text-xs font-medium rounded-md text-center transition-colors ${
-                  assignmentType === 'urgent'
-                    ? 'bg-rose-600 text-white'
-                    : 'bg-rose-50 text-rose-800 hover:bg-rose-100'
-                }`}
-              >
-                Urgent Shortage
-              </button>
-              <button
-                type="button"
-                onClick={() => setAssignmentType('unassigned')}
-                className={`py-1.5 px-2 text-xs font-medium rounded-md text-center transition-colors ${
-                  assignmentType === 'unassigned'
-                    ? 'bg-slate-700 text-white'
-                    : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
-                }`}
-              >
-                Open / Unset
-              </button>
-            </div>
-          </div>
-
-          {/* Dynamic selector based on Assignment Type */}
-          {assignmentType === 'in_house' && (
-            <div className="p-3 bg-slate-50 rounded-lg border border-slate-200 space-y-2">
-              <label className="block text-xs font-medium text-slate-700">
-                Select In-House Employee
-              </label>
-              <select
-                value={selectedStaffId}
-                onChange={(e) => handleStaffChange(e.target.value)}
-                className="w-full text-xs bg-white border border-slate-200 rounded-md px-3 py-2 text-slate-900 font-medium"
-              >
-                <option value="">-- Choose Staff Member --</option>
-                {inHouseStaff.map((staff) => {
-                  const isAvailable = staff.availableDays.includes(dayIndex);
-                  const hasSkill = staff.skills.includes(role);
-                  return (
-                    <option key={staff.id} value={staff.id}>
-                      {staff.name} ({staff.role}) · ${staff.hourlyRate}/h{' '}
-                      {!isAvailable ? '· (Day Off Conflict)' : ''}{' '}
-                      {!hasSkill ? '· (Skill Mismatch)' : ''}
-                    </option>
-                  );
-                })}
-              </select>
-              <p className="text-[11px] text-slate-500">
-                Tip: Auto-scheduler automatically checks availability & skill sets.
-              </p>
-            </div>
-          )}
-
-          {assignmentType === 'adhoc' && (
-            <div className="p-3 bg-amber-50/60 rounded-lg border border-amber-200 space-y-2">
-              <div className="flex items-center justify-between">
-                <label className="text-xs font-medium text-amber-900">
-                  Select Verified Casual Contract Worker
-                </label>
-                <span className="text-[11px] text-amber-700 font-mono">+$4.50 placement fee</span>
-              </div>
-              <select
-                value={selectedAdHocId}
-                onChange={(e) => handleAdHocChange(e.target.value)}
-                className="w-full text-xs bg-white border border-amber-300 rounded-md px-3 py-2 text-slate-900 font-medium"
-              >
-                <option value="">-- Choose from Ready Pool --</option>
-                {adHocWorkers.map((worker) => (
-                  <option key={worker.id} value={worker.id}>
-                    {worker.name} · {worker.primaryRole} · ${worker.hourlyRate}/h · {worker.rating}★ ({worker.completedShiftsCount} shifts)
-                  </option>
-                ))}
-              </select>
-              {shiftToEdit && onOpenAdHocBooking && (
-                <button
-                  type="button"
-                  onClick={() => {
-                    onClose();
-                    onOpenAdHocBooking(shiftToEdit);
-                  }}
-                  className="w-full text-center text-xs font-semibold text-amber-800 hover:text-amber-900 py-1 underline"
-                >
-                  Browse Full Marketplace Profiles & Ratings →
-                </button>
-              )}
-            </div>
-          )}
-
-          {assignmentType === 'urgent' && (
-            <div className="p-3 bg-rose-50 rounded-lg border border-rose-200">
-              <div className="flex items-start gap-2">
-                <Zap className="w-4 h-4 text-rose-600 mt-0.5 shrink-0" />
-                <div>
-                  <h4 className="text-xs font-semibold text-rose-900">
-                    Flagged as Urgent Shortage
-                  </h4>
-                  <p className="text-[11px] text-rose-700 mt-0.5 leading-relaxed">
-                    This shift will be highlighted in bright red on the roster. You can 1-click broadcast it to job portals and agency partners or match directly from the casual pool.
-                  </p>
-                </div>
-              </div>
-            </div>
-          )}
-
-          {/* Hourly Rate & Store Cost Estimate */}
-          <div className="grid grid-cols-2 gap-3">
-            <div>
-              <label className="block text-xs font-semibold text-slate-700 mb-1">
-                Hourly Base Rate ($/hr)
-              </label>
-              <div className="relative">
-                <span className="absolute left-3 top-2 text-xs text-slate-400">$</span>
-                <input
-                  type="number"
-                  step="0.5"
-                  value={hourlyRate}
-                  onChange={(e) => setHourlyRate(parseFloat(e.target.value) || 0)}
-                  className="w-full text-xs font-mono font-medium pl-6 pr-3 py-2 bg-slate-50 border border-slate-200 rounded-lg text-slate-900"
-                />
-              </div>
-            </div>
-            <div>
-              <label className="block text-xs font-semibold text-slate-700 mb-1">
-                Estimated Shift Cost
-              </label>
-              <div className="text-xs font-mono font-semibold py-2 px-3 bg-slate-100 rounded-lg text-slate-800 tabular-nums">
-                ${(hours * hourlyRate + (assignmentType === 'adhoc' ? 4.5 : 0)).toFixed(2)}
-                {assignmentType === 'adhoc' && (
-                  <span className="text-[10px] text-slate-500 font-sans ml-1">
-                    (incl. $4.50 fee)
-                  </span>
-                )}
-              </div>
-            </div>
-          </div>
-
-          {/* Notes */}
-          <div>
-            <label className="block text-xs font-semibold text-slate-700 mb-1">
-              Store Operational Notes
-            </label>
-            <input
-              type="text"
-              placeholder="e.g. Register opening, weekend rush support, keyholder"
-              value={notes}
-              onChange={(e) => setNotes(e.target.value)}
-              className="w-full text-xs bg-slate-50 border border-slate-200 rounded-lg px-3 py-2 text-slate-900"
+            <textarea
+              rows={2}
+              value={taskDescription}
+              onChange={(e) => setTaskDescription(e.target.value)}
+              placeholder="Outline specific responsibilities, closing checklist items, or hygiene requirements..."
+              className="w-full text-xs bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl p-2.5 text-slate-800 dark:text-slate-200 focus:ring-2 focus:ring-indigo-500"
             />
           </div>
 
-          {/* Modal Actions */}
-          <div className="flex items-center justify-between pt-3 border-t border-slate-100">
-            {shiftToEdit && onDeleteShift ? (
-              <button
-                type="button"
-                onClick={() => {
-                  onDeleteShift(shiftToEdit.id);
-                  onClose();
-                }}
-                className="flex items-center gap-1.5 text-xs font-medium text-rose-600 hover:text-rose-700 py-1.5 px-2.5 rounded transition-colors"
-              >
-                <Trash2 className="w-3.5 h-3.5" />
-                <span>Remove Shift</span>
-              </button>
-            ) : (
-              <div />
-            )}
+          {/* Time Slot Presets */}
+          <div>
+            <label className="block text-xs font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400 mb-1.5">
+              Time Slot Presets
+            </label>
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+              {TIME_SLOT_PRESETS.map((preset) => (
+                <button
+                  type="button"
+                  key={preset.label}
+                  onClick={() => handlePresetSlot(preset)}
+                  className={`py-1.5 px-2.5 rounded-lg text-xs font-medium border text-center transition-all cursor-pointer ${
+                    slotType === preset.label
+                      ? 'border-indigo-600 bg-indigo-50 dark:bg-indigo-950 text-indigo-700 dark:text-indigo-300 font-bold'
+                      : 'border-slate-200 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-800 text-slate-600 dark:text-slate-300'
+                  }`}
+                >
+                  <div>{preset.label}</div>
+                  <div className="text-[10px] text-slate-400 font-mono">
+                    {preset.start} - {preset.end}
+                  </div>
+                </button>
+              ))}
+            </div>
+          </div>
 
-            <div className="flex items-center gap-2">
+          {/* Timing & Duration Inputs */}
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 bg-slate-50 dark:bg-slate-850 p-3.5 rounded-xl border border-slate-100 dark:border-slate-800 text-xs">
+            <div>
+              <label className="block text-[11px] font-semibold text-slate-500 mb-1">Start Time *</label>
+              <input
+                type="time"
+                required
+                value={startTime}
+                onChange={(e) => setStartTime(e.target.value)}
+                className="w-full bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg p-2 font-mono text-xs"
+              />
+            </div>
+            <div>
+              <label className="block text-[11px] font-semibold text-slate-500 mb-1">End Time *</label>
+              <input
+                type="time"
+                required
+                value={endTime}
+                onChange={(e) => setEndTime(e.target.value)}
+                className="w-full bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg p-2 font-mono text-xs"
+              />
+            </div>
+            <div>
+              <label className="block text-[11px] font-semibold text-slate-500 mb-1">Unpaid Break</label>
+              <select
+                value={unpaidBreakMinutes}
+                onChange={(e) => setUnpaidBreakMinutes(Number(e.target.value))}
+                className="w-full bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg p-2 text-xs"
+              >
+                <option value={0}>No Break (0m)</option>
+                <option value={15}>15 Minutes</option>
+                <option value={30}>30 Minutes</option>
+                <option value={45}>45 Minutes</option>
+                <option value={60}>60 Minutes</option>
+              </select>
+            </div>
+            <div>
+              <label className="block text-[11px] font-semibold text-slate-500 mb-1">Net Paid Hours</label>
+              <div className="p-2 font-mono font-bold text-indigo-600 dark:text-indigo-400 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg text-center">
+                {hours}h
+              </div>
+            </div>
+          </div>
+
+          {/* Headcount, Hourly Rate & Shortage Calculation */}
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+            <div>
+              <label className="block text-xs font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400 mb-1.5 flex items-center justify-between">
+                <span>Required Headcount *</span>
+              </label>
+              <div className="flex items-center gap-2">
+                <input
+                  type="number"
+                  min={1}
+                  max={10}
+                  required
+                  value={requiredHeadcount}
+                  onChange={(e) => setRequiredHeadcount(Math.max(1, Number(e.target.value)))}
+                  className="w-full text-xs bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl p-2.5 font-bold font-mono text-center text-slate-800 dark:text-slate-200 focus:ring-2 focus:ring-indigo-500"
+                />
+              </div>
+              <p className="text-[10px] text-slate-400 mt-1">Number of staff needed on shift</p>
+            </div>
+
+            <div>
+              <label className="block text-xs font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400 mb-1.5">
+                Hourly Base Rate ($/h) *
+              </label>
+              <div className="relative">
+                <span className="absolute left-3 top-2.5 text-slate-400 text-xs">$</span>
+                <input
+                  type="number"
+                  min={10}
+                  max={60}
+                  step={0.5}
+                  required
+                  value={hourlyRate}
+                  onChange={(e) => setHourlyRate(Number(e.target.value))}
+                  className="w-full text-xs bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl pl-7 p-2.5 font-bold font-mono text-slate-800 dark:text-slate-200 focus:ring-2 focus:ring-indigo-500"
+                />
+              </div>
+              <p className="text-[10px] text-slate-400 mt-1">Total: ${(hours * hourlyRate).toFixed(2)}/person</p>
+            </div>
+
+            <div>
+              <label className="block text-xs font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400 mb-1.5">
+                Manpower Calculation
+              </label>
+              <div className={`p-2.5 rounded-xl border text-xs ${
+                shortage > 0
+                  ? 'bg-rose-50 dark:bg-rose-950/40 border-rose-200 dark:border-rose-900/60'
+                  : 'bg-emerald-50 dark:bg-emerald-950/40 border-emerald-200 dark:border-emerald-900/60'
+              }`}>
+                <div className="flex items-center justify-between font-bold">
+                  <span>Assigned: {assignedWorkerIds.length}</span>
+                  <span className={shortage > 0 ? 'text-rose-600' : 'text-emerald-600'}>
+                    {shortage > 0 ? `Shortage: -${shortage}` : 'Fully Covered'}
+                  </span>
+                </div>
+                <div className="text-[10px] text-slate-500 mt-0.5">
+                  Formula: MAX(Required - Confirmed, 0)
+                </div>
+              </div>
+            </div>
+          </div>
+
+          {/* Required Skills Multi-select */}
+          <div>
+            <label className="block text-xs font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400 mb-1.5">
+              Required Skills & Certifications
+            </label>
+            <div className="flex flex-wrap gap-1.5">
+              {ROLES.map((skill) => {
+                const isSelected = requiredSkills.includes(skill);
+                return (
+                  <button
+                    type="button"
+                    key={skill}
+                    onClick={() => toggleSkill(skill)}
+                    className={`px-2.5 py-1 text-xs rounded-lg border transition-all cursor-pointer ${
+                      isSelected
+                        ? 'bg-indigo-600 text-white border-indigo-600 font-semibold shadow-2xs'
+                        : 'bg-slate-50 dark:bg-slate-800 border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-300 hover:bg-slate-100'
+                    }`}
+                  >
+                    {skill}
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+
+          {/* Assign In-House Workers */}
+          <div>
+            <label className="block text-xs font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400 mb-1.5">
+              Assign Internal Staff ({assignedWorkerIds.length} / {requiredHeadcount} selected)
+            </label>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 max-h-36 overflow-y-auto p-2 border border-slate-200 dark:border-slate-700 rounded-xl bg-slate-50/50 dark:bg-slate-850/40">
+              {inHouseStaff.map((staff) => {
+                const isAssigned = assignedWorkerIds.includes(staff.id);
+                const isAvailable = staff.availableDays.includes(dayIndex);
+                const hasSkill = staff.skills.includes(role);
+
+                return (
+                  <label
+                    key={staff.id}
+                    className={`flex items-center gap-2 p-2 rounded-lg border text-xs cursor-pointer transition-colors ${
+                      isAssigned
+                        ? 'bg-indigo-50 dark:bg-indigo-950/70 border-indigo-300 dark:border-indigo-700 text-indigo-900 dark:text-indigo-200 font-semibold'
+                        : 'bg-white dark:bg-slate-800 border-slate-200 dark:border-slate-700 hover:bg-slate-50 text-slate-700 dark:text-slate-200'
+                    }`}
+                  >
+                    <input
+                      type="checkbox"
+                      checked={isAssigned}
+                      onChange={() => toggleWorkerAssignment(staff.id)}
+                      className="rounded text-indigo-600 focus:ring-indigo-500 h-4 w-4"
+                    />
+                    <img
+                      src={staff.avatar}
+                      alt={staff.name}
+                      className="w-6 h-6 rounded-full object-cover shrink-0"
+                    />
+                    <div className="min-w-0 flex-1">
+                      <p className="truncate text-xs">{staff.name}</p>
+                      <div className="flex items-center gap-1.5 text-[10px] text-slate-400">
+                        <span>${staff.hourlyRate}/h</span>
+                        {hasSkill && <span className="text-emerald-500">✓ Skilled</span>}
+                        {!isAvailable && <span className="text-amber-500">⚠ Off-day</span>}
+                      </div>
+                    </div>
+                  </label>
+                );
+              })}
+            </div>
+          </div>
+
+          {/* Recurring Schedule Option */}
+          <div className="p-3.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50/50 dark:bg-slate-850/40 flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-xs">
+            <div>
+              <span className="font-bold text-slate-800 dark:text-slate-200 flex items-center gap-1.5">
+                <Repeat className="w-3.5 h-3.5 text-indigo-500" /> Recurring Schedule Pattern
+              </span>
+              <p className="text-[11px] text-slate-500 dark:text-slate-400 mt-0.5">
+                Automatically replicate this shift across multiple days of the week.
+              </p>
+            </div>
+            <select
+              value={recurringSchedule}
+              onChange={(e) => setRecurringSchedule(e.target.value as any)}
+              className="text-xs bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg px-2.5 py-1.5 text-slate-700 dark:text-slate-200 font-medium focus:ring-2 focus:ring-indigo-500"
+            >
+              <option value="none">One-off Shift (No repeat)</option>
+              <option value="daily">Daily (Mon - Sun, 7 days)</option>
+              <option value="weekdays">Weekdays Only (Mon - Fri)</option>
+              <option value="weekends">Weekends Only (Sat - Sun)</option>
+              <option value="weekly">Weekly on this day</option>
+            </select>
+          </div>
+
+          {/* Notes & Template Checkbox */}
+          <div className="space-y-3">
+            <div>
+              <label className="block text-xs font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400 mb-1.5">
+                Shift Notes / Handover Instructions
+              </label>
+              <input
+                type="text"
+                value={notes}
+                onChange={(e) => setNotes(e.target.value)}
+                placeholder="e.g. Expect heavy delivery intake at 10am; verify milk fridge temp."
+                className="w-full text-xs bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl p-2.5 text-slate-800 dark:text-slate-200 focus:ring-2 focus:ring-indigo-500"
+              />
+            </div>
+
+            {!shiftToEdit && (
+              <label className="flex items-center gap-2 cursor-pointer text-xs text-slate-700 dark:text-slate-300">
+                <input
+                  type="checkbox"
+                  checked={saveAsTemplate}
+                  onChange={(e) => setSaveAsTemplate(e.target.checked)}
+                  className="rounded text-indigo-600 focus:ring-indigo-500 h-4 w-4"
+                />
+                <span className="font-medium">
+                  Save as reusable task template for future fast 1-click scheduling
+                </span>
+              </label>
+            )}
+          </div>
+
+          {/* Modal Actions */}
+          <div className="pt-4 border-t border-slate-200 dark:border-slate-800 flex items-center justify-between gap-3">
+            <div>
+              {shiftToEdit && onDeleteShift && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    onDeleteShift(shiftToEdit.id);
+                    onClose();
+                  }}
+                  className="px-3 py-2 text-xs font-semibold text-rose-600 hover:text-rose-700 hover:bg-rose-50 dark:hover:bg-rose-950/50 rounded-xl transition-colors flex items-center gap-1 cursor-pointer"
+                >
+                  <Trash2 className="w-3.5 h-3.5" />
+                  Delete Shift
+                </button>
+              )}
+            </div>
+
+            <div className="flex items-center gap-2.5">
               <button
                 type="button"
                 onClick={onClose}
-                className="px-3 py-1.5 text-xs font-medium text-slate-600 hover:text-slate-900 rounded-lg hover:bg-slate-100 transition-colors"
+                className="px-4 py-2 text-xs font-medium text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-xl transition-colors cursor-pointer"
               >
                 Cancel
               </button>
               <button
                 type="submit"
-                className="px-4 py-1.5 text-xs font-semibold text-white bg-slate-900 hover:bg-slate-800 rounded-lg shadow-sm transition-colors"
+                className="px-5 py-2 text-xs font-bold text-white bg-indigo-600 hover:bg-indigo-700 rounded-xl shadow-xs transition-colors cursor-pointer"
               >
-                {shiftToEdit ? 'Save Changes' : 'Create Shift'}
+                {shiftToEdit ? 'Save Shift Changes' : 'Publish to Roster'}
               </button>
             </div>
           </div>

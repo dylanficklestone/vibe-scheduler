@@ -1,199 +1,210 @@
 import React, { useState } from 'react';
 import {
-  Calendar,
-  Zap,
-  Users,
-  Clock,
-  DollarSign,
-  BarChart2,
-  MessageSquare,
-  Store,
   Menu,
+  Zap,
+  Bell,
+  Sun,
+  Moon,
+  Store,
+  Layers,
+  AlertTriangle,
+  ChevronDown,
   X,
+  ExternalLink,
 } from 'lucide-react';
-import { StoreProfile } from '../types';
-
-export type NavTab = 'roster' | 'adhoc' | 'staff' | 'timesheets' | 'salary' | 'analytics' | 'community';
+import { StoreProfile, Shift, NavTab } from '../types';
 
 interface HeaderProps {
-  currentTab: NavTab;
-  onTabChange: (tab: NavTab) => void;
   activeStore: StoreProfile;
   stores: StoreProfile[];
   onSelectStore: (store: StoreProfile) => void;
+  urgentShifts: Shift[];
   onOpenUrgentModal: () => void;
-  onOpenCanvasModal?: () => void;
-  urgentShiftsCount: number;
-}
-
-interface NavItem {
-  key: NavTab;
-  label: string;
-  badge?: number;
+  onOpenCanvasModal: () => void;
+  onToggleMobileMenu: () => void;
+  onNavigateTab: (tab: NavTab) => void;
+  theme: 'light' | 'dark';
+  onToggleTheme: () => void;
+  sidebarCollapsed: boolean;
 }
 
 export const Header: React.FC<HeaderProps> = ({
-  currentTab,
-  onTabChange,
   activeStore,
   stores,
   onSelectStore,
+  urgentShifts,
   onOpenUrgentModal,
-  urgentShiftsCount,
+  onOpenCanvasModal,
+  onToggleMobileMenu,
+  onNavigateTab,
+  theme,
+  onToggleTheme,
+  sidebarCollapsed,
 }) => {
-  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
-
-  const navItems: NavItem[] = [
-    { key: 'roster', label: 'Roster', badge: urgentShiftsCount > 0 ? urgentShiftsCount : undefined },
-    { key: 'adhoc', label: 'Ad-Hoc Pool' },
-    { key: 'staff', label: 'Staff' },
-    { key: 'timesheets', label: 'Timesheets' },
-    { key: 'salary', label: 'Salary' },
-    { key: 'analytics', label: 'Insights' },
-    { key: 'community', label: 'Community' },
-  ];
-
-  const handleTabClick = (tab: NavTab) => {
-    onTabChange(tab);
-    setMobileMenuOpen(false);
-  };
+  const [notificationsOpen, setNotificationsOpen] = useState(false);
 
   return (
-    <header className="bg-white border-b border-slate-200 sticky top-0 z-40 w-full max-w-full">
-      <div className="max-w-7xl mx-auto px-3 sm:px-6 lg:px-8">
-        <div className="flex items-center justify-between gap-3 h-14 sm:h-16">
-          {/* Zone 1: Brand & Outlet Selection */}
-          <div className="flex items-center gap-2.5 sm:gap-3 shrink-0">
-            <button
-              onClick={() => handleTabClick('roster')}
-              className="flex items-center gap-2 text-left focus:outline-none"
-            >
-              <div className="w-7 h-7 sm:w-8 sm:h-8 rounded-lg bg-slate-900 text-white flex items-center justify-center font-bold text-sm shrink-0">
-                S
-              </div>
-              <div className="flex items-baseline gap-1.5">
-                <span className="text-base sm:text-lg font-bold tracking-tight text-slate-900 whitespace-nowrap">
-                  ShiftPulse
-                </span>
-                <span className="hidden xl:inline text-[11px] text-slate-500 font-mono">
-                  1-Store
-                </span>
-              </div>
-            </button>
+    <header className="sticky top-0 z-30 bg-white/90 dark:bg-slate-900/90 backdrop-blur-md border-b border-slate-200 dark:border-slate-800 transition-colors">
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 flex items-center justify-between h-16 gap-3">
+        {/* Left side: Hamburger (mobile) + Breadcrumbs/Store badge */}
+        <div className="flex items-center gap-3">
+          <button
+            onClick={onToggleMobileMenu}
+            aria-label="Open mobile menu"
+            className="lg:hidden p-2 rounded-lg text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors"
+          >
+            <Menu className="w-5 h-5" />
+          </button>
 
-            {/* Subtle Outlet Dropdown */}
-            <div className="relative flex items-center pl-2 sm:pl-3 border-l border-slate-200">
-              <Store className="w-3.5 h-3.5 text-slate-400 mr-1.5 shrink-0 hidden sm:block" />
-              <select
-                value={activeStore.id}
-                onChange={(e) => {
-                  const s = stores.find((x) => x.id === e.target.value);
-                  if (s) onSelectStore(s);
-                }}
-                className="text-xs font-medium text-slate-700 bg-slate-50 hover:bg-slate-100 border border-slate-200 rounded px-2 py-1 max-w-[120px] sm:max-w-[160px] truncate focus:outline-none cursor-pointer"
-                title={`Active Store: ${activeStore.name}`}
-              >
-                {stores.map((s) => (
-                  <option key={s.id} value={s.id}>
-                    {s.name}
-                  </option>
-                ))}
-              </select>
+          {/* App title on mobile when sidebar is hidden */}
+          <div className="lg:hidden flex items-center gap-2">
+            <div className="w-7 h-7 rounded-lg bg-indigo-600 text-white flex items-center justify-center font-bold text-xs">
+              WR
             </div>
+            <span className="text-sm font-bold text-slate-900 dark:text-white truncate max-w-[140px] sm:max-w-none">
+              Weekly Roster & Shift Operations
+            </span>
           </div>
 
-          {/* Zone 2: Navigation Links (Clean text tabs) */}
-          <nav className="hidden lg:flex items-center gap-1 xl:gap-2">
-            {navItems.map((item) => {
-              const isActive = currentTab === item.key;
-              return (
-                <button
-                  key={item.key}
-                  onClick={() => handleTabClick(item.key)}
-                  className={`relative px-2.5 py-1.5 text-xs font-medium transition-colors whitespace-nowrap shrink-0 flex items-center gap-1.5 rounded-md ${
-                    isActive
-                      ? 'text-slate-900 font-bold bg-slate-100'
-                      : 'text-slate-600 hover:text-slate-900 hover:bg-slate-50'
-                  }`}
-                >
-                  <span>{item.label}</span>
-                  {item.badge !== undefined && (
-                    <span className="px-1.5 py-0.2 text-[10px] font-bold bg-rose-600 text-white rounded-full leading-tight font-mono">
-                      {item.badge}
-                    </span>
-                  )}
-                </button>
-              );
-            })}
-          </nav>
-
-          {/* Zone 3: 1 Primary Action (Request Cover CTA) + mobile toggle */}
-          <div className="flex items-center gap-2 shrink-0">
-            <button
-              onClick={onOpenUrgentModal}
-              className="flex items-center gap-1.5 px-3 py-1.5 sm:px-3.5 sm:py-2 text-xs font-semibold text-white bg-rose-600 hover:bg-rose-700 rounded-lg shadow-xs transition-colors whitespace-nowrap shrink-0 cursor-pointer"
-            >
-              <Zap className="w-3.5 h-3.5 text-amber-300" />
-              <span className="hidden xs:inline">Request Cover</span>
-              <span className="xs:hidden">Cover</span>
-            </button>
-
-            {/* Mobile menu hamburger toggle */}
-            <button
-              onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
-              className="lg:hidden p-1.5 text-slate-600 hover:text-slate-900 hover:bg-slate-100 rounded-md transition-colors"
-              aria-label="Toggle navigation menu"
-            >
-              {mobileMenuOpen ? <X className="w-5 h-5" /> : <Menu className="w-5 h-5" />}
-            </button>
+          {/* Desktop store indicator badge */}
+          <div className="hidden lg:flex items-center gap-2 pl-1">
+            <span className="flex items-center gap-1.5 px-2.5 py-1 rounded-md bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 text-xs font-medium border border-slate-200/80 dark:border-slate-700/80">
+              <Store className="w-3.5 h-3.5 text-indigo-500" />
+              <span className="font-semibold text-slate-900 dark:text-white">{activeStore.name}</span>
+              <span className="text-slate-400 dark:text-slate-500">·</span>
+              <span className="text-slate-500 dark:text-slate-400 text-[11px]">{activeStore.type}</span>
+            </span>
           </div>
         </div>
 
-        {/* Medium Screen Horizontal Navigation Bar */}
-        <div className="hidden md:flex lg:hidden items-center gap-1 py-1.5 border-t border-slate-100 overflow-x-auto scrollbar-none text-xs">
-          {navItems.map((item) => {
-            const isActive = currentTab === item.key;
-            return (
-              <button
-                key={item.key}
-                onClick={() => handleTabClick(item.key)}
-                className={`px-2.5 py-1 text-xs whitespace-nowrap rounded font-medium transition-colors ${
-                  isActive ? 'bg-slate-900 text-white' : 'text-slate-600 hover:bg-slate-100'
-                }`}
-              >
-                {item.label}
-                {item.badge !== undefined && ` (${item.badge})`}
-              </button>
-            );
-          })}
-        </div>
+        {/* Right side: Quick Actions */}
+        <div className="flex items-center gap-2 sm:gap-3">
+          {/* Business Model Canvas Button */}
+          <button
+            onClick={onOpenCanvasModal}
+            className="hidden sm:inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold text-slate-700 dark:text-slate-200 bg-slate-100 hover:bg-slate-200/80 dark:bg-slate-800 dark:hover:bg-slate-750 border border-slate-200 dark:border-slate-700 rounded-lg transition-colors cursor-pointer"
+            title="View 9-Block Business Model Canvas"
+          >
+            <Layers className="w-3.5 h-3.5 text-indigo-500" />
+            <span>BMC Strategy</span>
+          </button>
 
-        {/* Mobile Dropdown Menu when toggled */}
-        {mobileMenuOpen && (
-          <div className="md:hidden py-3 border-t border-slate-200 space-y-1 animate-in fade-in slide-in-from-top-1 duration-150">
-            {navItems.map((item) => {
-              const isActive = currentTab === item.key;
-              return (
-                <button
-                  key={item.key}
-                  onClick={() => handleTabClick(item.key)}
-                  className={`w-full flex items-center justify-between px-3 py-2 text-xs font-medium rounded-lg text-left transition-colors ${
-                    isActive
-                      ? 'bg-slate-900 text-white font-semibold'
-                      : 'text-slate-700 hover:bg-slate-100'
-                  }`}
-                >
-                  <span>{item.label}</span>
-                  {item.badge !== undefined && (
-                    <span className="px-1.5 py-0.5 text-[10px] font-bold bg-rose-600 text-white rounded-full">
-                      {item.badge} Urgent
+          {/* Request / Emergency Cover Button */}
+          <button
+            onClick={onOpenUrgentModal}
+            className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold text-white bg-rose-600 hover:bg-rose-700 rounded-lg shadow-xs transition-colors cursor-pointer"
+          >
+            <Zap className="w-3.5 h-3.5 text-amber-300" />
+            <span className="hidden xs:inline">Request Cover</span>
+            <span className="xs:hidden">Cover</span>
+            {urgentShifts.length > 0 && (
+              <span className="ml-0.5 px-1.5 py-0.2 bg-white/25 rounded-full text-[10px] font-bold">
+                {urgentShifts.length}
+              </span>
+            )}
+          </button>
+
+          {/* Notification Bell */}
+          <div className="relative">
+            <button
+              onClick={() => setNotificationsOpen(!notificationsOpen)}
+              className="relative p-2 rounded-lg text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors cursor-pointer"
+              aria-label="Staffing notifications"
+            >
+              <Bell className="w-4 h-4" />
+              {urgentShifts.length > 0 && (
+                <span className="absolute top-1.5 right-1.5 w-2 h-2 rounded-full bg-rose-500 ring-2 ring-white dark:ring-slate-900" />
+              )}
+            </button>
+
+            {/* Notification Dropdown */}
+            {notificationsOpen && (
+              <div className="absolute right-0 mt-2 w-80 sm:w-96 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl shadow-xl p-3 z-50 animate-in fade-in slide-in-from-top-1">
+                <div className="flex items-center justify-between pb-2 border-b border-slate-100 dark:border-slate-800">
+                  <div className="flex items-center gap-1.5">
+                    <span className="text-xs font-bold text-slate-900 dark:text-white">Staffing Alerts</span>
+                    <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400 font-semibold">
+                      {urgentShifts.length}
                     </span>
+                  </div>
+                  <button
+                    onClick={() => setNotificationsOpen(false)}
+                    className="p-1 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200"
+                  >
+                    <X className="w-3.5 h-3.5" />
+                  </button>
+                </div>
+
+                <div className="py-2 space-y-2 max-h-72 overflow-y-auto">
+                  {urgentShifts.length === 0 ? (
+                    <div className="text-center py-6 text-xs text-slate-500 dark:text-slate-400">
+                      No urgent shortages right now! All shifts are currently staffed.
+                    </div>
+                  ) : (
+                    urgentShifts.map((shift) => (
+                      <div
+                        key={shift.id}
+                        className="p-2.5 rounded-lg bg-rose-50/70 dark:bg-rose-950/40 border border-rose-200/80 dark:border-rose-900/50 flex items-start justify-between gap-2"
+                      >
+                        <div className="min-w-0">
+                          <p className="text-xs font-bold text-rose-900 dark:text-rose-200 truncate">
+                            {shift.taskName || shift.role} · Shortage
+                          </p>
+                          <p className="text-[11px] text-rose-700 dark:text-rose-300">
+                            {shift.dateStr} ({shift.startTime} - {shift.endTime})
+                          </p>
+                        </div>
+                        <button
+                          onClick={() => {
+                            setNotificationsOpen(false);
+                            onNavigateTab('emergency');
+                          }}
+                          className="shrink-0 px-2 py-1 text-[11px] font-semibold text-rose-700 dark:text-rose-200 bg-white dark:bg-slate-900 hover:bg-rose-100 border border-rose-300 dark:border-rose-800 rounded-md transition-colors"
+                        >
+                          Cover
+                        </button>
+                      </div>
+                    ))
                   )}
-                </button>
-              );
-            })}
+                </div>
+
+                <div className="pt-2 border-t border-slate-100 dark:border-slate-800 flex justify-between">
+                  <button
+                    onClick={() => {
+                      setNotificationsOpen(false);
+                      onNavigateTab('roster');
+                    }}
+                    className="text-xs font-medium text-indigo-600 dark:text-indigo-400 hover:underline"
+                  >
+                    View Weekly Roster
+                  </button>
+                  <button
+                    onClick={() => {
+                      setNotificationsOpen(false);
+                      onNavigateTab('emergency');
+                    }}
+                    className="text-xs font-semibold text-rose-600 dark:text-rose-400 hover:underline"
+                  >
+                    Emergency Dispatch Hub →
+                  </button>
+                </div>
+              </div>
+            )}
           </div>
-        )}
+
+          {/* Theme Switcher in header for quick access */}
+          <button
+            onClick={onToggleTheme}
+            aria-label="Toggle dark/light mode"
+            className="p-2 rounded-lg text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors cursor-pointer"
+          >
+            {theme === 'dark' ? (
+              <Sun className="w-4 h-4 text-amber-400" />
+            ) : (
+              <Moon className="w-4 h-4 text-slate-600" />
+            )}
+          </button>
+        </div>
       </div>
     </header>
   );

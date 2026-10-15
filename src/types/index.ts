@@ -1,4 +1,12 @@
-export type ShiftRole = 'Barista' | 'Cashier' | 'Kitchen / Cook' | 'Floor Lead' | 'Retail Associate' | 'Inventory / Stock';
+export type ShiftRole =
+  | 'Barista'
+  | 'Cashier'
+  | 'Kitchen / Cook'
+  | 'Floor Lead'
+  | 'Retail Associate'
+  | 'Inventory / Stock'
+  | 'Dishwasher / Cleaner'
+  | 'Supervisor';
 
 export type ShiftTimeSlot = 'Morning' | 'Mid-Day' | 'Evening' | 'Full Day';
 
@@ -14,8 +22,20 @@ export interface PublicHoliday {
   types: string[];
 }
 
+export type StaffingStatus =
+  | 'fully_staffed'
+  | 'partially_staffed'
+  | 'unfilled'
+  | 'urgent_needed'
+  | 'filled'
+  | 'unassigned';
+
 export interface Shift {
   id: string;
+  storeId?: string;
+  companyName?: string;
+  taskName?: string;
+  taskDescription?: string;
   dayIndex: number; // 0 = Mon, 1 = Tue, ... 6 = Sun
   dateStr: string; // e.g. '2026-10-19'
   startTime: string; // e.g. '08:00'
@@ -23,13 +43,75 @@ export interface Shift {
   hours: number;
   role: ShiftRole;
   slotType: ShiftTimeSlot;
-  assignedStaffId?: string; // in-house staff ID
-  assignedAdHocId?: string; // external casual worker ID
+  requiredHeadcount?: number;
+  assignedWorkerIds?: string[]; // IDs of assigned workers (in-house or ad-hoc)
+  assignedStaffId?: string; // backwards compatibility
+  assignedAdHocId?: string; // backwards compatibility
   isAdHoc: boolean;
-  status: 'filled' | 'unassigned' | 'urgent_needed';
+  status: StaffingStatus;
   notes?: string;
   hourlyRate: number;
+  requiredSkills?: ShiftRole[];
+  unpaidBreakMinutes?: number;
+  recurringSchedule?: 'none' | 'daily' | 'weekdays' | 'weekends' | 'weekly';
+  templateId?: string;
 }
+
+export interface TaskTemplate {
+  id: string;
+  taskName: string;
+  taskDescription: string;
+  role: ShiftRole;
+  startTime: string;
+  endTime: string;
+  hours: number;
+  requiredHeadcount: number;
+  hourlyRate: number;
+  requiredSkills: ShiftRole[];
+  slotType: ShiftTimeSlot;
+  unpaidBreakMinutes: number;
+}
+
+export interface ActivityItem {
+  id: string;
+  type:
+    | 'shift_created'
+    | 'worker_assigned'
+    | 'absence_reported'
+    | 'hiring_request'
+    | 'temp_accepted'
+    | 'shift_completed';
+  title: string;
+  description: string;
+  timestamp: string; // e.g. '10 mins ago' or formatted string
+  timestampMs?: number;
+  storeId?: string;
+}
+
+export interface UserPreferences {
+  theme: 'light' | 'dark';
+  sidebarCollapsed: boolean;
+  selectedStoreId: string;
+  otThreshold: number;
+  employerCpfRate: number;
+  weekendAllowance: number;
+  phMultiplier: number;
+}
+
+export type NavTab =
+  | 'dashboard'
+  | 'roster'
+  | 'calendar'
+  | 'staff'
+  | 'adhoc'
+  | 'emergency'
+  | 'availability'
+  | 'timesheets'
+  | 'salary'
+  | 'reports'
+  | 'stores'
+  | 'community'
+  | 'settings';
 
 export interface InHouseStaff {
   id: string;
@@ -45,6 +127,7 @@ export interface InHouseStaff {
   availableDays: number[]; // 0=Mon, ..., 6=Sun
   blackoutDates: string[];
   notes?: string;
+  status?: 'active' | 'on_leave';
 }
 
 export interface AdHocWorker {

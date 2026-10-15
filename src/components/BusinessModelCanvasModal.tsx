@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { X, Layers, ExternalLink, CheckCircle2 } from 'lucide-react';
 import { BMC_CANVAS_MAPPING } from '../data/mockData';
-import { NavTab } from './Header';
+import { NavTab } from '../types';
 
 interface BusinessModelCanvasModalProps {
   isOpen: boolean;
@@ -37,7 +37,7 @@ export const BusinessModelCanvasModal: React.FC<BusinessModelCanvasModalProps> =
                 </span>
               </div>
               <p className="text-xs text-slate-500">
-                Interactive mapping showing how every sticky note in the user's canvas is operationalized in ShiftPulse.
+                Interactive mapping showing how every sticky note in the user's canvas is operationalized in Weekly Roster & Shift Operations.
               </p>
             </div>
           </div>

@@ -34,7 +34,7 @@ async function startServer() {
   }
 
   app.listen(PORT, '0.0.0.0', () => {
-    console.log(`ShiftPulse full-stack server running on http://0.0.0.0:${PORT}`);
+    console.log(`Weekly Roster & Shift Operations server running on http://0.0.0.0:${PORT}`);
   });
 }
 
